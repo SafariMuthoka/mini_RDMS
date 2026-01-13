@@ -264,8 +264,7 @@ class SQLParser:
         if dtype in ("TEXT", "STRING"):
             return str
         raise SQLParseError(f"Unknown type '{dtype}'")
-
+    
     def _parse_value(self, val):
-        if val.isdigit():
-            return int(val)
-        return val.strip("'")
+    # shlex already removes quotes
+        return val

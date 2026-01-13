@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Mini RDBMS</title>
+
+    <style>
+        body {
+            font-family: Arial, Helvetica, sans-serif;
+            background: #f4f6f8;
+            margin: 0;
+            padding: 0;
+        }
+
+        .container {
+            width: 900px;
+            margin: 40px auto;
+            background: #ffffff;
+            padding: 25px;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 10px;
+        }
+
+        p.subtitle {
+            text-align: center;
+            color: #555;
+            margin-bottom: 25px;
+        }
+
+        textarea {
+            width: 100%;
+            height: 120px;
+            font-family: monospace;
+            font-size: 14px;
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid #ccc;
+            resize: vertical;
+        }
+
+        button {
+            margin-top: 10px;
+            padding: 10px 18px;
+            font-size: 14px;
+            border: none;
+            border-radius: 6px;
+            background: #007bff;
+            color: white;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #0056b3;
+        }
+
+        .error {
+            background: #ffe0e0;
+            color: #900;
+            padding: 10px;
+            border-radius: 6px;
+            margin-top: 20px;
+        }
+
+        .message {
+            background: #e0f0ff;
+            color: #003366;
+            padding: 10px;
+            border-radius: 6px;
+            margin-top: 20px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        th, td {
+            padding: 10px;
+            border: 1px solid #ccc;
+            text-align: left;
+        }
+
+        th {
+            background: #f0f0f0;
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            color: #777;
+            font-size: 12px;
+        }
+    </style>
+</head>
+
+<body>
+<div class="container">
+
+    <h1>Mini RDBMS</h1>
+    <p class="subtitle">
+        SQL Interface for a Custom Relational Database Engine
+    </p>
+
+    <form method="post">
+        <textarea name="sql" placeholder="Enter SQL here...
+Example:
+SELECT * FROM users;"></textarea>
+        <br>
+        <button type="submit">Run Query</button>
+    </form>
+
+    {% if error %}
+        <div class="error">
+            <strong>Error:</strong> {{ error }}
+        </div>
+    {% endif %}
+
+    {% if result is string %}
+        <div class="message">
+            {{ result }}
+        </div>
+    {% endif %}
+
+    {% if result is number %}
+        <div class="message">
+            {{ result }} row(s) affected
+        </div>
+    {% endif %}
+
+    {% if result is iterable and result and result[0] is mapping %}
+        <table>
+            <thead>
+            <tr>
+                {% for col in result[0].keys() %}
+                    <th>{{ col }}</th>
+                {% endfor %}
+            </tr>
+            </thead>
+            <tbody>
+            {% for row in result %}
+                <tr>
+                    {% for val in row.values() %}
+                        <td>{{ val }}</td>
+                    {% endfor %}
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    {% endif %}
+
+    {% if result is iterable and result and result[0] is string %}
+        <div class="message">
+            {% for item in result %}
+                {{ item }}<br>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <div class="footer">
+        Custom RDBMS • SQL Parser • Executor • Indexing • Joins
+    </div>
+
+</div>
+</body>
+</html>
