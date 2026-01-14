@@ -27,6 +27,7 @@ class Database:
     # ================= LOAD =================
 
     def _load_tables(self):
+        # 1. Load schemas first
         for filename in self.persistence.list_tables():
             path = os.path.join(self.persistence.data_dir, filename)
             meta, columns = self.persistence.load_table(path)
@@ -37,11 +38,12 @@ class Database:
                 primary_key=meta.get("primary_key"),
                 unique_keys=meta.get("unique_keys", []),
                 foreign_keys=meta.get("foreign_keys", []),
+                indexes=meta.get("indexes", []),
             )
 
             self._tables[table.name] = table
 
-        # insert rows AFTER all tables exist (FK safe)
+        # 2. Load rows after all tables exist (FK-safe)
         for filename in self.persistence.list_tables():
             path = os.path.join(self.persistence.data_dir, filename)
             meta, _ = self.persistence.load_table(path)
@@ -59,6 +61,7 @@ class Database:
         primary_key=None,
         unique_keys=None,
         foreign_keys=None,
+        indexes=None,
     ):
         if table_name in self._tables:
             raise TableAlreadyExistsError(
@@ -71,6 +74,7 @@ class Database:
             primary_key=primary_key,
             unique_keys=unique_keys or [],
             foreign_keys=foreign_keys or [],
+            indexes=indexes or [],
         )
 
         self._tables[table_name] = table
@@ -114,12 +118,9 @@ class Database:
         table = self.get_table(table_name)
 
         def wrapped_where(row):
-            if where is None:
-                return True
-            return where(row)
+            return True if where is None else where(row)
 
         count = table.update(updates, wrapped_where)
-
         self.persistence.save_table(table)
         return count
 
@@ -127,12 +128,9 @@ class Database:
         table = self.get_table(table_name)
 
         def wrapped_where(row):
-            if where is None:
-                return True
-            return where(row)
+            return True if where is None else where(row)
 
         count = table.delete(wrapped_where)
-
         self.persistence.save_table(table)
         return count
 

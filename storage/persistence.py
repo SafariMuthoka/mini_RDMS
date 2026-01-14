@@ -9,6 +9,8 @@ class PersistenceManager:
         self.data_dir = data_dir
         os.makedirs(self.data_dir, exist_ok=True)
 
+    # ================= SAVE =================
+
     def save_table(self, table):
         path = os.path.join(self.data_dir, f"{table.name}.json")
 
@@ -20,11 +22,15 @@ class PersistenceManager:
             },
             "primary_key": table.primary_key,
             "unique_keys": table.unique_keys,
-            "rows": table._storage.all(),
+            "indexes": list(table._indexes.keys()),
+            "foreign_keys": table.foreign_keys,
+            "rows": table.rows,
         }
 
         with open(path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
+
+    # ================= LOAD =================
 
     def load_table(self, path):
         with open(path, "r", encoding="utf-8") as f:
@@ -36,6 +42,8 @@ class PersistenceManager:
         }
 
         return data, columns
+
+    # ================= UTIL =================
 
     def list_tables(self):
         return [

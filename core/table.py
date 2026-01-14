@@ -22,16 +22,19 @@ class Table:
         primary_key: str = None,
         unique_keys: List[str] = None,
         foreign_keys: List[dict] = None,
+        indexes: List[str] = None,
     ):
         self.name = name
         self.columns = columns
         self.primary_key = primary_key
         self.unique_keys = unique_keys or []
         self.foreign_keys = foreign_keys or []
+        self.indexes = indexes or []
 
         self._storage = MemoryStorage()
 
-        self._indexes: Dict[str, Dict[Any, Dict]] = {}
+        # column -> { value -> [rows] }
+        self._indexes: Dict[str, Dict[Any, List[dict]]] = {}
 
         self._validate_schema()
         self._init_indexes()
@@ -50,6 +53,12 @@ class Table:
                     f"Unique key '{key}' not in schema"
                 )
 
+        for key in self.indexes:
+            if key not in self.columns:
+                raise SchemaError(
+                    f"Index '{key}' not in schema"
+                )
+
         for fk in self.foreign_keys:
             if fk["column"] not in self.columns:
                 raise SchemaError(
@@ -57,11 +66,13 @@ class Table:
                 )
 
     def _init_indexes(self):
+        all_indexes = set(self.indexes)
         if self.primary_key:
-            self._indexes[self.primary_key] = {}
+            all_indexes.add(self.primary_key)
+        all_indexes.update(self.unique_keys)
 
-        for key in self.unique_keys:
-            self._indexes[key] = {}
+        for col in all_indexes:
+            self._indexes[col] = {}
 
     # ================= INTERNAL =================
 
@@ -78,28 +89,35 @@ class Table:
                 )
 
     def _check_constraints(self, row: Dict, ignore_row=None):
-        for key, index in self._indexes.items():
+        for key in [self.primary_key] + self.unique_keys:
+            if not key:
+                continue
+
             value = row.get(key)
             if value is None:
                 continue
 
-            existing = index.get(value)
-            if existing is not None and existing is not ignore_row:
-                raise ConstraintViolationError(
-                    f"Duplicate value '{value}' for key '{key}'"
-                )
+            bucket = self._indexes.get(key, {}).get(value, [])
+            for existing in bucket:
+                if existing is not ignore_row:
+                    raise ConstraintViolationError(
+                        f"Duplicate value '{value}' for key '{key}'"
+                    )
 
     def _add_indexes(self, row: Dict):
-        for key, index in self._indexes.items():
-            value = row.get(key)
-            if value is not None:
-                index[value] = row
+        for col, index in self._indexes.items():
+            value = row.get(col)
+            if value is None:
+                continue
+            index.setdefault(value, []).append(row)
 
     def _remove_indexes(self, row: Dict):
-        for key, index in self._indexes.items():
-            value = row.get(key)
+        for col, index in self._indexes.items():
+            value = row.get(col)
             if value in index:
-                del index[value]
+                index[value].remove(row)
+                if not index[value]:
+                    del index[value]
 
     # ================= CRUD =================
 
@@ -117,14 +135,14 @@ class Table:
         if where is None:
             return self._storage.all()
 
+        # indexed equality lookup
         if (
             isinstance(where, dict)
             and where.get("op") == "="
             and where.get("left") in self._indexes
         ):
             value = where["right"]
-            row = self._indexes[where["left"]].get(value)
-            return [row] if row else []
+            return list(self._indexes[where["left"]].get(value, []))
 
         if callable(where):
             return self._storage.filter(where)
@@ -134,7 +152,7 @@ class Table:
     def update(self, updates: Dict, where: Callable):
         updated = 0
 
-        for row in self._storage.all():
+        for row in list(self._storage.all()):
             if not where(row):
                 continue
 
@@ -153,11 +171,7 @@ class Table:
         return updated
 
     def delete(self, where: Callable):
-        to_delete = []
-
-        for row in self._storage.all():
-            if where(row):
-                to_delete.append(row)
+        to_delete = [row for row in self._storage.all() if where(row)]
 
         for row in to_delete:
             self._remove_indexes(row)

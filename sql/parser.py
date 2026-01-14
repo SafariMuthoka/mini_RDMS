@@ -30,10 +30,14 @@ class SQLParser:
 
         raise SQLParseError(f"Unsupported command '{cmd}'")
 
+    # ================= SHOW =================
+
     def _parse_show(self, tokens):
         if len(tokens) == 2 and tokens[1].upper() == "TABLES":
             return {"type": "show_tables"}
         raise SQLParseError("Invalid SHOW command")
+
+    # ================= CREATE =================
 
     def _parse_create(self, tokens):
         if len(tokens) < 4 or tokens[1].upper() != "TABLE":
@@ -104,6 +108,8 @@ class SQLParser:
             "foreign_keys": foreign_keys,
         }
 
+    # ================= INSERT =================
+
     def _parse_insert(self, sql: str):
         upper = sql.upper()
 
@@ -117,7 +123,9 @@ class SQLParser:
         values = self._parse_values(values_part)
 
         if "(" in before_vals:
-            cols_raw = before_vals[before_vals.find("(") + 1 : before_vals.find(")")]
+            cols_raw = before_vals[
+                before_vals.find("(") + 1 : before_vals.find(")")
+            ]
             cols = [c.strip() for c in cols_raw.split(",")]
 
             if len(cols) != len(values):
@@ -135,6 +143,8 @@ class SQLParser:
             "values": {"__VALUES__": values},
         }
 
+    # ================= SELECT =================
+
     def _parse_select(self, tokens):
         i = 1
         fields = []
@@ -148,6 +158,9 @@ class SQLParser:
 
         table = tokens[i + 1]
         i += 2
+
+        if fields == ["*"]:
+            fields = None
 
         join = None
         where = None
@@ -178,21 +191,26 @@ class SQLParser:
             "where": where,
         }
 
+    # ================= UPDATE =================
+
     def _parse_update(self, tokens):
         table = tokens[1]
 
         if tokens[2].upper() != "SET":
             raise SQLParseError("Expected SET")
 
-        i = 3
         updates = {}
+        i = 3
 
         while i < len(tokens) and tokens[i].upper() != "WHERE":
             if tokens[i + 1] != "=":
-                raise SQLParseError("Expected '='")
+                raise SQLParseError("Expected '=' in UPDATE")
 
             updates[tokens[i]] = self._parse_value(tokens[i + 2])
+
             i += 3
+            if i < len(tokens) and tokens[i] == ",":
+                i += 1
 
         where = None
         if i < len(tokens) and tokens[i].upper() == "WHERE":
@@ -204,6 +222,8 @@ class SQLParser:
             "updates": updates,
             "where": where,
         }
+
+    # ================= DELETE =================
 
     def _parse_delete(self, tokens):
         if tokens[1].upper() != "FROM":
@@ -220,6 +240,8 @@ class SQLParser:
             "table": table,
             "where": where,
         }
+
+    # ================= WHERE =================
 
     def _parse_where(self, tokens):
         if "AND" in tokens:
@@ -242,7 +264,12 @@ class SQLParser:
             raise SQLParseError("Invalid WHERE clause")
 
         col, op, val = tokens
-        return {"op": op, "left": col, "right": self._parse_value(val)}
+        if op != "=":
+            raise SQLParseError("Only '=' operator supported")
+
+        return {"op": "=", "left": col, "right": self._parse_value(val)}
+
+    # ================= VALUES =================
 
     def _parse_values(self, raw: str):
         raw = raw.strip()
@@ -257,6 +284,8 @@ class SQLParser:
 
         return [self._parse_value(token.strip()) for token in lexer]
 
+    # ================= UTIL =================
+
     def _map_type(self, dtype):
         dtype = dtype.upper()
         if dtype in ("INT", "INTEGER"):
@@ -264,7 +293,8 @@ class SQLParser:
         if dtype in ("TEXT", "STRING"):
             return str
         raise SQLParseError(f"Unknown type '{dtype}'")
-    
+
     def _parse_value(self, val):
-    # shlex already removes quotes
+         # shlex already removes quotes
         return val
+

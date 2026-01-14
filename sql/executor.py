@@ -34,12 +34,12 @@ class SQLExecutor:
             f"Unknown SQL statement type '{stmt_type}'"
         )
 
-    # ================= SHOW TABLES =================
+    # ================= SHOW =================
 
     def _show_tables(self):
         return self.db.list_tables()
 
-    # ================= CREATE TABLE =================
+    # ================= CREATE =================
 
     def _create_table(self, ast):
         self.db.create_table(
@@ -47,16 +47,17 @@ class SQLExecutor:
             columns=ast["columns"],
             primary_key=ast.get("primary_key"),
             unique_keys=ast.get("unique_keys", []),
+            foreign_keys=ast.get("foreign_keys", []),
         )
         return "OK"
 
     # ================= INSERT =================
 
     def _insert(self, ast):
+        table = self.db.get_table(ast["table"])
         values = ast["values"]
 
         if "__VALUES__" in values:
-            table = self.db.get_table(ast["table"])
             columns = list(table.columns.keys())
 
             if len(values["__VALUES__"]) != len(columns):
@@ -64,9 +65,25 @@ class SQLExecutor:
                     "Column count does not match value count"
                 )
 
-            row = dict(zip(columns, values["__VALUES__"]))
+            raw_row = dict(zip(columns, values["__VALUES__"]))
         else:
-            row = values
+            raw_row = values
+
+        # ✅ TYPE COERCION BASED ON TABLE SCHEMA
+        row = {}
+        for col, val in raw_row.items():
+            expected_type = table.columns[col]
+
+            if val is None:
+                row[col] = None
+                continue
+
+            try:
+                row[col] = expected_type(val)
+            except Exception:
+                raise SQLExecutionError(
+                    f"Column '{col}' expects {expected_type.__name__}"
+                )
 
         self.db.insert(ast["table"], row)
         return "OK"
@@ -75,19 +92,16 @@ class SQLExecutor:
 
     def _select(self, ast):
         table = self.db.get_table(ast["table"])
-        rows = table.select()
+
+        # 🔥 Indexed WHERE optimization happens inside Table.select
+        rows = table.select(ast.get("where"))
 
         if ast.get("join"):
             rows = self._execute_join(rows, ast)
 
-        if ast.get("where"):
-            rows = [
-                row for row in rows
-                if self._eval_where(ast["where"], row)
-            ]
+        fields = ast.get("fields")
 
-        fields = ast["fields"]
-        if fields != ["*"]:
+        if fields and fields != ["*"]:
             projected = []
 
             for row in rows:
@@ -109,7 +123,7 @@ class SQLExecutor:
 
     def _update(self, ast):
         def where_fn(row):
-            if ast["where"] is None:
+            if ast.get("where") is None:
                 return True
             return self._eval_where(ast["where"], row)
 
@@ -123,7 +137,7 @@ class SQLExecutor:
 
     def _delete(self, ast):
         def where_fn(row):
-            if ast["where"] is None:
+            if ast.get("where") is None:
                 return True
             return self._eval_where(ast["where"], row)
 
@@ -186,17 +200,7 @@ class SQLExecutor:
         joined = []
 
         for l in left_rows:
-            if left_col not in l:
-                raise SQLExecutionError(
-                    f"Unknown column '{left_col}'"
-                )
-
             for r in right_rows:
-                if right_col not in r:
-                    raise SQLExecutionError(
-                        f"Unknown column '{right_col}'"
-                    )
-
                 if l[left_col] == r[right_col]:
                     merged = {}
                     merged.update(l)

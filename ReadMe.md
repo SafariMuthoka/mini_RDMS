@@ -1,34 +1,69 @@
-Mini SQL Engine with Web App (Python)
+## MiniRDMS Engine (Python)
+A lightweight, Relational Database Management System engine implemented in pure Python.
+The project demonstrates SQL parsing, query execution, schema enforcement, indexing, and persistence, without relying on external database systems.
 
-A fully in-memory SQL database engine written in Python, featuring a custom SQL parser, executor, indexing system, and an optional Flask web application for executing SQL via HTTP.
-This project demonstrates how real database engines work internally — from parsing to execution to storage.
+This engine supports a meaningful subset of SQL while remaining simple, readable, and extensible.
 
-📌 Key Features
+## Project Objectives
+Demonstrate how SQL engines work internally
+Implement parsing → execution → storage flow
+Enforce schema constraints (PK, UNIQUE, FK)
+Support indexed queries for performance
+Persist data using JSON storage
+Serve as a learning and assessment project,.
 
-SQL Parser → AST → Executor pipeline
-In-memory row storage
-Table schema validation
-PRIMARY KEY & UNIQUE indexes
-Fast indexed WHERE column = value
-JOIN support(inner join)
-Interactive SQL shell (CLI)
-Web API (Flask) interface
-Zero external database dependencies
+## Features
+✅ Data Definition (DDL)
+CREATE TABLE
+Column type enforcement (INT, TEXT)
+PRIMARY KEY
+UNIQUE
+FOREIGN KEY
 
-📁 Project Structure
+✅ Data Manipulation (DML)
+INSERT INTO table VALUES (...)
+INSERT INTO table (columns...) VALUES (...)
+SELECT *
+SELECT column1, column2
 
-project/
-│
+## WHERE conditions:
+=, !=, <, >
+AND, OR
+UPDATE ... SET ... WHERE ...
+DELETE FROM ... WHERE ...
+
+✅ Indexing
+## Automatic indexes on:
+Primary keys
+Unique columns
+Indexed equality lookups for fast SELECTs
+
+✅ JOIN Support
+## Inner joins using:
+SELECT ...
+FROM table1
+JOIN table2 ON table1.col = table2.col;
+
+✅ #Storage
+## In-memory execution
+Persistent JSON storage (/data directory)
+Tables reload automatically on restart
+
+## Archtecture Overview
+.RDMS
+├── core/
+│   ├── table.py
+│   └── database.py
 ├── sql/
-│   ├── parser.py          # SQL → AST parser
-│   ├── executor.py        # AST → execution engine
-│
+│   ├── parser.py
+│   └── executor.py
 ├── storage/
-│   └── memory.py          # In-memory storage layer
-│
-├──core/
-     database.py            # Database + table registry
-├    table.py               # Table schema, indexes, constraints
-├── webapp.py              # Flask web application
-├── REPL.py                # CLI SQL REPL
+│   ├── memory.py
+│   └── persistence.py
+├── data/
+│   └── .gitkeep
+├── web/
+│   └── app.py   (or index.html / backend)
+├── repl.py
 ├── README.md
+└── requirements.txt (optional)
